@@ -4,7 +4,7 @@ import {
   Mic, MicOff, Send, Terminal, Cpu, Database, 
   Settings, Activity, MessageSquare, Code, 
   Zap, Globe, Volume2, VolumeX, History,
-  Maximize2, Minimize2, Power
+  Maximize2, Minimize2, Power, Monitor, HardDrive
 } from 'lucide-react';
 import { processJarvisInput, JarvisResponse } from './services/geminiService';
 import ReactMarkdown from 'react-markdown';
@@ -87,6 +87,15 @@ const useVoice = () => {
       // Check if API is available
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         throw new Error('BROWSER_NOT_SUPPORTED');
+      }
+
+      // Check for available devices first
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const hasMic = devices.some(device => device.kind === 'audioinput');
+      if (!hasMic) {
+        const err = new Error('Requested device not found');
+        err.name = 'NotFoundError';
+        throw err;
       }
 
       // Request stream
@@ -283,6 +292,125 @@ const TroubleshootingGuide = ({ error, onClose }: { error: string, onClose: () =
   );
 };
 
+// --- System Access Component ---
+const SystemAccess = () => {
+  const [isBridgeActive, setIsBridgeActive] = useState(false);
+  const [systemStats, setSystemStats] = useState({
+    cpu: 12,
+    ram: 45,
+    temp: 42,
+    disk: 68
+  });
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setSystemStats({
+        cpu: Math.floor(Math.random() * 20) + 5,
+        ram: Math.floor(Math.random() * 10) + 40,
+        temp: Math.floor(Math.random() * 5) + 40,
+        disk: 68
+      });
+    }, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="flex-1 p-8 space-y-8 overflow-y-auto">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold tracking-widest uppercase">System Access Bridge</h2>
+          <p className="text-xs opacity-50 mt-1">ESTABLISHING LOCAL PC CONNECTION PROTOCOL</p>
+        </div>
+        <button 
+          onClick={() => setIsBridgeActive(!isBridgeActive)}
+          className={cn(
+            "px-6 py-2 rounded-full font-bold text-xs tracking-widest transition-all",
+            isBridgeActive 
+              ? "bg-green-500 text-black shadow-[0_0_20px_rgba(34,197,94,0.4)]" 
+              : "bg-[#00f2ff]/10 border border-[#00f2ff]/30 text-[#00f2ff]"
+          )}
+        >
+          {isBridgeActive ? 'BRIDGE_ACTIVE' : 'INITIALIZE_BRIDGE'}
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {[
+          { label: 'CPU LOAD', value: `${systemStats.cpu}%`, icon: Cpu, color: 'text-blue-400' },
+          { label: 'MEMORY', value: `${systemStats.ram}%`, icon: Database, color: 'text-purple-400' },
+          { label: 'CORE TEMP', value: `${systemStats.temp}°C`, icon: Zap, color: 'text-orange-400' },
+          { label: 'DISK SPACE', value: `${systemStats.disk}%`, icon: Database, color: 'text-green-400' },
+        ].map((stat, i) => (
+          <motion.div 
+            key={i}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.1 }}
+            className="p-6 bg-black/40 border border-[#00f2ff]/10 rounded-2xl space-y-4"
+          >
+            <div className="flex items-center justify-between">
+              <stat.icon className={cn("w-5 h-5", stat.color)} />
+              <span className="text-[10px] font-mono opacity-40 uppercase">{stat.label}</span>
+            </div>
+            <div className="text-3xl font-bold font-mono tracking-tighter">{stat.value}</div>
+            <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
+              <motion.div 
+                animate={{ width: stat.value }}
+                className={cn("h-full", stat.color.replace('text', 'bg'))}
+              />
+            </div>
+          </motion.div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 space-y-6">
+          <div className="p-6 bg-black/40 border border-[#00f2ff]/10 rounded-3xl space-y-6">
+            <h3 className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+              <Terminal className="w-4 h-4 text-[#00f2ff]" />
+              Local Command Terminal
+            </h3>
+            <div className="space-y-4">
+              {[
+                { cmd: 'open chrome --search "latest ai news"', status: 'SUCCESS', time: '10:24:05' },
+                { cmd: 'system_check --deep', status: 'SUCCESS', time: '10:23:12' },
+                { cmd: 'launch_app "spotify"', status: 'PENDING', time: '10:22:45' },
+              ].map((log, i) => (
+                <div key={i} className="flex items-center justify-between p-3 bg-white/5 rounded-xl text-[11px] font-mono">
+                  <div className="flex items-center gap-3">
+                    <span className="opacity-30">[{log.time}]</span>
+                    <span className="text-[#00f2ff]">$ {log.cmd}</span>
+                  </div>
+                  <span className={cn(
+                    "px-2 py-0.5 rounded text-[9px]",
+                    log.status === 'SUCCESS' ? "bg-green-500/10 text-green-400" : "bg-yellow-500/10 text-yellow-400"
+                  )}>{log.status}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <div className="p-6 bg-[#00f2ff]/5 border border-[#00f2ff]/20 rounded-3xl space-y-4">
+            <h3 className="text-sm font-bold uppercase tracking-widest">Bridge Setup</h3>
+            <p className="text-xs opacity-60 leading-relaxed">
+              To allow JARVIS to access your local PC (files, apps, system), you must run the JARVIS Local Bridge script on your machine.
+            </p>
+            <div className="p-3 bg-black/60 rounded-xl border border-white/5 font-mono text-[10px] text-green-400/80">
+              pip install jarvis-bridge<br/>
+              jarvis-bridge --connect {window.location.hostname}
+            </div>
+            <button className="w-full py-3 bg-[#00f2ff] text-black rounded-xl font-bold text-xs uppercase hover:scale-[1.02] transition-all">
+              Download Bridge Script
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // --- Main Component ---
 export default function App() {
   const [input, setInput] = useState('');
@@ -290,7 +418,7 @@ export default function App() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [systemStatus, setSystemStatus] = useState('ONLINE');
-  const [activeTab, setActiveTab] = useState<'chat' | 'logs' | 'memory' | 'code'>('chat');
+  const [activeTab, setActiveTab] = useState<'chat' | 'logs' | 'memory' | 'code' | 'system'>('chat');
   const [logs, setLogs] = useState<any[]>([]);
   const [memory, setMemory] = useState<any[]>([]);
   
@@ -368,6 +496,24 @@ export default function App() {
 
       setMessages(prev => [...prev, jarvisMsg]);
       
+      if (response.type === 'automation' || response.type === 'system') {
+        setLogs(prev => [{
+          id: Date.now(),
+          type: response.type.toUpperCase(),
+          command: text,
+          timestamp: new Date()
+        }, ...prev]);
+      }
+
+      // Handle Spotify Playback
+      if (response.type === 'system' && response.action === 'spotify_play') {
+        const query = encodeURIComponent(response.data || '');
+        const spotifyUrl = `https://open.spotify.com/search/${query}`;
+        window.open(spotifyUrl, '_blank');
+        setSystemStatus(`PLAYING ON SPOTIFY: ${response.data}`);
+        setTimeout(() => setSystemStatus('ONLINE'), 3000);
+      }
+
       if (!isMuted) {
         speak(response.text, response.language);
       }
@@ -427,7 +573,7 @@ export default function App() {
         <div className="flex items-center gap-6">
           <div className="hidden md:flex flex-col items-end">
             <span className="text-[10px] opacity-50 uppercase">Neural Network</span>
-            <span className="text-xs">GEMINI-3.1-PRO</span>
+            <span className="text-xs">GEMINI-3-FLASH</span>
           </div>
           <div className="h-8 w-[1px] bg-[#00f2ff]/20" />
           <button 
@@ -447,6 +593,7 @@ export default function App() {
         {/* Sidebar Nav */}
         <nav className="w-16 border-r border-[#00f2ff]/20 flex flex-col items-center py-8 gap-8 bg-[#0a0a0a]/40">
           <NavButton active={activeTab === 'chat'} onClick={() => setActiveTab('chat')} icon={<MessageSquare />} label="Chat" />
+          <NavButton active={activeTab === 'system'} onClick={() => setActiveTab('system')} icon={<Monitor />} label="System" />
           <NavButton active={activeTab === 'code'} onClick={() => setActiveTab('code')} icon={<Code />} label="Code" />
           <NavButton active={activeTab === 'memory'} onClick={() => setActiveTab('memory')} icon={<Database />} label="Memory" />
           <NavButton active={activeTab === 'logs'} onClick={() => setActiveTab('logs')} icon={<History />} label="Logs" />
@@ -586,8 +733,9 @@ export default function App() {
             </div>
 
             {/* Side Panels */}
+            {activeTab === 'system' && <SystemAccess />}
             <AnimatePresence>
-              {activeTab !== 'chat' && (
+              {activeTab !== 'chat' && activeTab !== 'system' && (
                 <motion.div 
                   initial={{ x: 300, opacity: 0 }}
                   animate={{ x: 0, opacity: 1 }}

@@ -4,11 +4,13 @@ import path from "path";
 import cors from "cors";
 import Database from "better-sqlite3";
 
+const app = express();
+
 async function startServer() {
-  const app = express();
   const PORT = 3000;
 
   // Database Setup
+  // Note: On Vercel, this will be read-only/temporary.
   const db = new Database("jarvis_memory.db");
   db.exec(`
     CREATE TABLE IF NOT EXISTS memories (
@@ -77,9 +79,14 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`JARVIS Core running on http://localhost:${PORT}`);
-  });
+  // Only listen if not running as a Vercel function
+  if (process.env.NODE_ENV !== "production" || !process.env.VERCEL) {
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`JARVIS Core running on http://localhost:${PORT}`);
+    });
+  }
 }
 
 startServer();
+
+export default app;
