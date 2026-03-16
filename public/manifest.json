@@ -1,0 +1,17 @@
+{
+  "name": "JARVIS Core",
+  "short_name": "JARVIS",
+  "description": "Advanced Neural Network Assistant",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#050505",
+  "theme_color": "#00f2ff",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/2103/2103633.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

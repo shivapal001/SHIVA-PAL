@@ -23,13 +23,19 @@ interface Message {
 // --- Voice Service ---
 const useVoice = () => {
   const [isListening, setIsListening] = useState(false);
+  const [isAlwaysOn, setIsAlwaysOn] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [interimTranscript, setInterimTranscript] = useState('');
   const [audioLevel, setAudioLevel] = useState(0);
   const recognitionRef = useRef<any>(null);
+  const isAlwaysOnRef = useRef(false);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animationFrameRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    isAlwaysOnRef.current = isAlwaysOn;
+  }, [isAlwaysOn]);
 
   useEffect(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -57,8 +63,17 @@ const useVoice = () => {
       };
 
       recognitionRef.current.onend = () => {
-        setIsListening(false);
-        stopAudioAnalysis();
+        if (isAlwaysOnRef.current) {
+          try {
+            recognitionRef.current.start();
+          } catch (e) {
+            setIsListening(false);
+            stopAudioAnalysis();
+          }
+        } else {
+          setIsListening(false);
+          stopAudioAnalysis();
+        }
       };
 
       recognitionRef.current.onerror = (event: any) => {
@@ -158,6 +173,7 @@ const useVoice = () => {
   };
 
   const startListening = async () => {
+    if (isListening) return;
     if (!recognitionRef.current) {
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       if (!SpeechRecognition) {
@@ -183,9 +199,19 @@ const useVoice = () => {
 
   const stopListening = () => {
     if (recognitionRef.current) {
+      setIsAlwaysOn(false);
       recognitionRef.current.stop();
       setIsListening(false);
       stopAudioAnalysis();
+    }
+  };
+
+  const toggleAlwaysOn = async () => {
+    if (isAlwaysOn) {
+      stopListening();
+    } else {
+      setIsAlwaysOn(true);
+      await startListening();
     }
   };
 
@@ -199,7 +225,7 @@ const useVoice = () => {
     window.speechSynthesis.speak(utterance);
   };
 
-  return { isListening, transcript, interimTranscript, audioLevel, startListening, stopListening, speak };
+  return { isListening, isAlwaysOn, toggleAlwaysOn, transcript, interimTranscript, audioLevel, startListening, stopListening, speak };
 };
 
 // --- Audio Visualizer Component ---
@@ -293,7 +319,7 @@ const TroubleshootingGuide = ({ error, onClose }: { error: string, onClose: () =
 };
 
 // --- System Access Component ---
-const SystemAccess = () => {
+const SystemAccess = ({ isConnected, onConnect }: { isConnected: boolean, onConnect: () => void }) => {
   const [isBridgeActive, setIsBridgeActive] = useState(false);
   const [systemStats, setSystemStats] = useState({
     cpu: 12,
@@ -393,6 +419,27 @@ const SystemAccess = () => {
 
         <div className="space-y-6">
           <div className="p-6 bg-[#00f2ff]/5 border border-[#00f2ff]/20 rounded-3xl space-y-4">
+            <h3 className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+              <Volume2 className="w-4 h-4" />
+              Spotify Integration
+            </h3>
+            <p className="text-xs opacity-60 leading-relaxed">
+              Connect your Spotify account to allow JARVIS to control playback directly via the API.
+            </p>
+            <button 
+              onClick={onConnect}
+              className={cn(
+                "w-full py-3 rounded-xl font-bold text-xs uppercase transition-all",
+                isConnected 
+                  ? "bg-green-500/20 text-green-400 border border-green-500/30" 
+                  : "bg-[#1DB954] text-white hover:scale-[1.02]"
+              )}
+            >
+              {isConnected ? 'Spotify Connected' : 'Connect Spotify'}
+            </button>
+          </div>
+
+          <div className="p-6 bg-[#00f2ff]/5 border border-[#00f2ff]/20 rounded-3xl space-y-4">
             <h3 className="text-sm font-bold uppercase tracking-widest">Bridge Setup</h3>
             <p className="text-xs opacity-60 leading-relaxed">
               To allow JARVIS to access your local PC (files, apps, system), you must run the JARVIS Local Bridge script on your machine.
@@ -421,9 +468,22 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<'chat' | 'logs' | 'memory' | 'code' | 'system'>('chat');
   const [logs, setLogs] = useState<any[]>([]);
   const [memory, setMemory] = useState<any[]>([]);
+  const [isSpotifyConnected, setIsSpotifyConnected] = useState(false);
   
-  const { isListening, transcript, interimTranscript, audioLevel, startListening, stopListening, speak } = useVoice();
+  const { isListening, isAlwaysOn, toggleAlwaysOn, transcript, interimTranscript, audioLevel, startListening, stopListening, speak } = useVoice();
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Background execution handler
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden && isAlwaysOn) {
+        console.log("JARVIS: Entering background mode...");
+        // Keep mic active if possible
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [isAlwaysOn]);
 
   useEffect(() => {
     const handleJarvisError = (e: any) => {
@@ -467,6 +527,39 @@ export default function App() {
     fetchMemory();
   }, []);
 
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'SPOTIFY_AUTH_SUCCESS') {
+        checkSpotifyStatus();
+        setSystemStatus('SPOTIFY CONNECTED');
+        setTimeout(() => setSystemStatus('ONLINE'), 3000);
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    checkSpotifyStatus();
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
+  const checkSpotifyStatus = async () => {
+    try {
+      const res = await fetch('/api/spotify/status');
+      const data = await res.json();
+      setIsSpotifyConnected(data.connected);
+    } catch (err) {
+      console.error('Spotify status check failed', err);
+    }
+  };
+
+  const connectSpotify = async () => {
+    try {
+      const res = await fetch('/api/auth/spotify/url');
+      const { url } = await res.json();
+      window.open(url, 'spotify_auth', 'width=600,height=700');
+    } catch (err) {
+      console.error('Failed to get Spotify auth URL', err);
+    }
+  };
+
   const handleSend = async (text: string = input) => {
     if (!text.trim()) return;
 
@@ -507,11 +600,33 @@ export default function App() {
 
       // Handle Spotify Playback
       if (response.type === 'system' && response.action === 'spotify_play') {
-        const query = encodeURIComponent(response.data || '');
-        const spotifyUrl = `https://open.spotify.com/search/${query}`;
-        window.open(spotifyUrl, '_blank');
-        setSystemStatus(`PLAYING ON SPOTIFY: ${response.data}`);
-        setTimeout(() => setSystemStatus('ONLINE'), 3000);
+        if (isSpotifyConnected) {
+          try {
+            const spotifyRes = await fetch('/api/spotify/play', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ query: response.data })
+            });
+            const spotifyData = await spotifyRes.json();
+            
+            if (spotifyData.success) {
+              setSystemStatus(`PLAYING: ${spotifyData.track} by ${spotifyData.artist}`);
+            } else {
+              // Fallback to web search if API fails (e.g. no active device)
+              const query = encodeURIComponent(response.data || '');
+              window.open(`https://open.spotify.com/search/${query}`, '_blank');
+              setSystemStatus(`OPENING SPOTIFY: ${response.data}`);
+            }
+          } catch (err) {
+            const query = encodeURIComponent(response.data || '');
+            window.open(`https://open.spotify.com/search/${query}`, '_blank');
+          }
+        } else {
+          const query = encodeURIComponent(response.data || '');
+          window.open(`https://open.spotify.com/search/${query}`, '_blank');
+          setSystemStatus(`OPENING SPOTIFY: ${response.data}`);
+        }
+        setTimeout(() => setSystemStatus('ONLINE'), 5000);
       }
 
       if (!isMuted) {
@@ -712,6 +827,16 @@ export default function App() {
                   <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
                     {isListening && <AudioVisualizer level={audioLevel} isListening={isListening} />}
                     <button 
+                      onClick={toggleAlwaysOn}
+                      className={cn(
+                        "p-3 rounded-full transition-all",
+                        isAlwaysOn ? "bg-[#00f2ff] text-black shadow-[0_0_15px_rgba(0,242,255,0.5)]" : "hover:bg-[#00f2ff]/10 text-[#00f2ff]/60"
+                      )}
+                      title={isAlwaysOn ? "Background Mode: ON" : "Background Mode: OFF"}
+                    >
+                      <Zap className={cn("w-5 h-5", isAlwaysOn && "animate-pulse")} />
+                    </button>
+                    <button 
                       onClick={isListening ? stopListening : startListening}
                       className={cn(
                         "p-3 rounded-full transition-all",
@@ -733,7 +858,7 @@ export default function App() {
             </div>
 
             {/* Side Panels */}
-            {activeTab === 'system' && <SystemAccess />}
+            {activeTab === 'system' && <SystemAccess isConnected={isSpotifyConnected} onConnect={connectSpotify} />}
             <AnimatePresence>
               {activeTab !== 'chat' && activeTab !== 'system' && (
                 <motion.div 
