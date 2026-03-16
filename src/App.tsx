@@ -637,6 +637,24 @@ export default function App() {
         setTimeout(() => setSystemStatus('ONLINE'), 5000);
       }
 
+      // Handle Instagram Messaging
+      if (response.type === 'system' && response.action === 'instagram_send') {
+        const { recipient, message } = response.data;
+        // Instagram direct message URL pattern (this opens the chat with the user)
+        const instaUrl = `https://www.instagram.com/direct/t/${recipient}/`;
+        window.open(instaUrl, '_blank');
+        
+        // Copy message to clipboard for easy pasting since auto-send in browser is restricted
+        try {
+          await navigator.clipboard.writeText(message);
+          setSystemStatus(`INSTA: CHAT OPENED & MSG COPIED`);
+        } catch (err) {
+          setSystemStatus(`OPENING INSTA CHAT: ${recipient}`);
+        }
+        
+        setTimeout(() => setSystemStatus('ONLINE'), 5000);
+      }
+
       if (!isMuted) {
         speak(response.text, response.language);
       }

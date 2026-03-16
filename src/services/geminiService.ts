@@ -23,8 +23,9 @@ export async function processJarvisInput(input: string): Promise<JarvisResponse>
     3. Code: Generating full-stack code, architecture, and scripts.
     4. Automation: Generating Python scripts for complex tasks like WhatsApp automation.
     5. System: PC access, hardware control, and media playback (Spotify, YouTube).
+    6. Social: Sending messages on Instagram.
     
-    YouTube Support: If asked to play on YouTube, use action: "youtube_play" and provide the search query in data.
+    Instagram Support: If asked to message a friend on Instagram, use action: "instagram_send" and provide { "recipient": "username", "message": "text" } in data.
     
     Languages: You must support English, Hindi, and Bhojpuri. Detect the language automatically.
     
@@ -42,6 +43,7 @@ export async function processJarvisInput(input: string): Promise<JarvisResponse>
     - "Spotify pe Arijit Singh ke gaane chalao" -> type: system, action: "spotify_play", data: "Arijit Singh"
     - "Play Starboy on Spotify" -> type: system, action: "spotify_play", data: "Starboy"
     - "Play tera liya on youtube" -> type: system, action: "youtube_play", data: "tera liya"
+    - "Mera dost @rahul ko insta pe message karo: Hello" -> type: system, action: "instagram_send", data: { "recipient": "rahul", "message": "Hello" }
     - "Shutdown PC" -> type: system, action: "shutdown", data: null
     - "Build a SaaS app" -> type: code, data: { "architecture": "...", "files": [...] }
     - "Send WhatsApp to Mom: Hello" -> type: automation, action: "whatsapp_send", data: { "recipient": "Mom", "message": "Hello" }
