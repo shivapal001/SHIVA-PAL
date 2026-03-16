@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
   Mic, MicOff, Send, Terminal, Cpu, Database, 
   Settings, Activity, MessageSquare, Code, 
@@ -511,15 +511,25 @@ export default function App() {
   }, [messages]);
 
   const fetchLogs = async () => {
-    const res = await fetch('/api/logs');
-    const data = await res.json();
-    setLogs(data);
+    try {
+      const res = await fetch('/api/logs');
+      if (!res.ok) throw new Error('Failed to fetch logs');
+      const data = await res.json();
+      setLogs(data);
+    } catch (err) {
+      console.error('Logs fetch failed', err);
+    }
   };
 
   const fetchMemory = async () => {
-    const res = await fetch('/api/memory');
-    const data = await res.json();
-    setMemory(data);
+    try {
+      const res = await fetch('/api/memory');
+      if (!res.ok) throw new Error('Failed to fetch memory');
+      const data = await res.json();
+      setMemory(data);
+    } catch (err) {
+      console.error('Memory fetch failed', err);
+    }
   };
 
   useEffect(() => {
