@@ -629,6 +629,14 @@ export default function App() {
         setTimeout(() => setSystemStatus('ONLINE'), 5000);
       }
 
+      // Handle YouTube Playback
+      if (response.type === 'system' && response.action === 'youtube_play') {
+        const query = encodeURIComponent(response.data || '');
+        window.open(`https://www.youtube.com/results?search_query=${query}`, '_blank');
+        setSystemStatus(`OPENING YOUTUBE: ${response.data}`);
+        setTimeout(() => setSystemStatus('ONLINE'), 5000);
+      }
+
       if (!isMuted) {
         speak(response.text, response.language);
       }
